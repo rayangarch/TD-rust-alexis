@@ -176,7 +176,7 @@ fn main() {
                 }
             };
 
-            let author = "Alexis Gardy <alexisgardy@example.com>";
+            let author = "Alexis Gardy <alexisgardy8@gmail.com>";
             let timestamp = 1_600_000_000;
             let timezone = "+0000";
 
