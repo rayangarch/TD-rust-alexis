@@ -1,3 +1,5 @@
+//TD rust rayan Garch
+
 use std::env;
 use std::fs;
 use std::io::Read;
@@ -5,14 +7,14 @@ use flate2::read::ZlibDecoder;
 use sha1::Digest;
 
 fn main() {
-    let args: Vec<String> = env::args().collect();
+    let command_args: Vec<String> = env::args().collect();
 
-    if args.len() < 2 {
+    if command_args.len() < 2 {
         eprintln!("No command provided");
         return;
     }
 
-    match args[1].as_str() {
+    match command_args[1].as_str() {
         "init" => {
             fs::create_dir(".git").ok();
             fs::create_dir(".git/objects").ok();
@@ -22,16 +24,16 @@ fn main() {
         }
 
         "cat-file" => {
-            if args.len() < 4 || args[2] != "-p" {
+            if command_args.len() < 4 || command_args[2] != "-p" {
                 eprintln!("Usage: cat-file -p <sha>");
                 return;
             }
-            let sha = &args[3];
-            let (dir, file) = sha.split_at(2);
-            let path = format!(".git/objects/{}/{}", dir, file);
+            let sha = &command_args[3];
+            let (hash_dir, hash_file) = sha.split_at(2);
+            let path = format!(".git/objects/{}/{}", hash_dir, hash_file);
 
-            let data = fs::read(path).unwrap();
-            let mut decoder = ZlibDecoder::new(&data[..]);
+            let compressed_data = fs::read(path).unwrap();
+            let mut decoder = ZlibDecoder::new(&compressed_data[..]);
             let mut decompressed = Vec::new();
             decoder.read_to_end(&mut decompressed).unwrap();
 
@@ -69,8 +71,8 @@ fn main() {
         }
 
         "hash-object" => {
-            let write_flag = args.contains(&"-w".to_string());
-            let filename = args.last().unwrap();
+            let write_flag = command_args.contains(&"-w".to_string());
+            let filename = command_args.last().unwrap();
             let content = fs::read(filename).unwrap();
             let store = [format!("blob {}\0", content.len()).into_bytes(), content].concat();
 
@@ -86,80 +88,80 @@ fn main() {
                     enc.write_all(&store).unwrap();
                     enc.finish().unwrap()
                 };
-                let (dir, file) = sha1.split_at(2);
-                fs::create_dir_all(format!(".git/objects/{}", dir)).ok();
-                fs::write(format!(".git/objects/{}/{}", dir, file), compressed).unwrap();
+                let (hash_dir, hash_file) = sha1.split_at(2);
+                fs::create_dir_all(format!(".git/objects/{}", hash_dir)).ok();
+                fs::write(format!(".git/objects/{}/{}", hash_dir, hash_file), compressed).unwrap();
             }
 
             println!("{}", sha1);
         }
 
         "ls-tree" => {
-            if args.len() < 4 || args[2] != "--name-only" {
+            if command_args.len() < 4 || command_args[2] != "--name-only" {
                 eprintln!("Usage: ls-tree --name-only <sha>");
                 return;
             }
-            let sha = &args[3];
-            let (dir, file) = sha.split_at(2);
-            let path = format!(".git/objects/{}/{}", dir, file);
+            let sha = &command_args[3];
+            let (hash_dir, hash_file) = sha.split_at(2);
+            let path = format!(".git/objects/{}/{}", hash_dir, hash_file);
 
-            let data = fs::read(path).unwrap();
-            let mut decoder = ZlibDecoder::new(&data[..]);
+            let compressed_data = fs::read(path).unwrap();
+            let mut decoder = ZlibDecoder::new(&compressed_data[..]);
             let mut decompressed = Vec::new();
             decoder.read_to_end(&mut decompressed).unwrap();
 
             let header_end = decompressed.iter().position(|&b| b == 0).unwrap();
-            let mut cursor = header_end + 1;
+            let mut cursor_pos = header_end + 1;
 
-            while cursor < decompressed.len() {
-                let mode_start = cursor;
-                while decompressed[cursor] != b' ' {
-                    cursor += 1;
+            while cursor_pos < decompressed.len() {
+                let mode_start = cursor_pos;
+                while decompressed[cursor_pos] != b' ' {
+                    cursor_pos += 1;
                 }
-                let _mode = String::from_utf8_lossy(&decompressed[mode_start..cursor]);
-                cursor += 1;
+                let _mode = String::from_utf8_lossy(&decompressed[mode_start..cursor_pos]);
+                cursor_pos += 1;
 
-                let name_start = cursor;
-                while decompressed[cursor] != 0 {
-                    cursor += 1;
+                let name_start = cursor_pos;
+                while decompressed[cursor_pos] != 0 {
+                    cursor_pos += 1;
                 }
-                let name = String::from_utf8_lossy(&decompressed[name_start..cursor]);
-                cursor += 1;
+                let name = String::from_utf8_lossy(&decompressed[name_start..cursor_pos]);
+                cursor_pos += 1;
 
-                cursor += 20;
+                cursor_pos += 20;
 
                 println!("{}", name);
             }
         }
 
         "commit-tree" => {
-            if args.len() < 5 {
+            if command_args.len() < 5 {
                 eprintln!("Usage: commit-tree <tree_sha> [-p <parent_sha>] -m <message>");
                 return;
             }
 
-            let tree_sha = &args[2];
+            let tree_sha = &command_args[2];
             let mut parent_sha: Option<&str> = None;
             let mut message: Option<String> = None;
 
-            let mut i = 3;
-            while i < args.len() {
-                match args[i].as_str() {
+            let mut arg_idx = 3;
+            while arg_idx < command_args.len() {
+                match command_args[arg_idx].as_str() {
                     "-p" => {
-                        if i + 1 >= args.len() {
+                        if arg_idx + 1 >= command_args.len() {
                             eprintln!("Missing value after -p");
                             return;
                         }
-                        parent_sha = Some(&args[i + 1]);
-                        i += 2;
+                        parent_sha = Some(&command_args[arg_idx + 1]);
+                        arg_idx += 2;
                     }
                     "-m" => {
-                        if i + 1 >= args.len() {
+                        if arg_idx + 1 >= command_args.len() {
                             eprintln!("Missing value after -m");
                             return;
                         }
-                        message = Some(args[i + 1].clone());
-                        i += 2;
+                        message = Some(command_args[arg_idx + 1].clone());
+                        arg_idx += 2;
                     }
                     other => {
                         eprintln!("Unknown option: {}", other);
@@ -176,7 +178,7 @@ fn main() {
                 }
             };
 
-            let author = "Alexis Gardy <alexisgardy8@gmail.com>";
+            let author = "Rayan Garch <rayan.garch@edu.devinci.fr>";
             let timestamp = 1_600_000_000;
             let timezone = "+0000";
 
@@ -213,9 +215,9 @@ fn main() {
                 enc.write_all(&store).unwrap();
                 let compressed = enc.finish().unwrap();
 
-                let (dir, file) = sha1.split_at(2);
-                fs::create_dir_all(format!(".git/objects/{}", dir)).ok();
-                fs::write(format!(".git/objects/{}/{}", dir, file), compressed).unwrap();
+                let (hash_dir, hash_file) = sha1.split_at(2);
+                fs::create_dir_all(format!(".git/objects/{}", hash_dir)).ok();
+                fs::write(format!(".git/objects/{}/{}", hash_dir, hash_file), compressed).unwrap();
             }
 
             println!("{}", sha1);
@@ -234,9 +236,9 @@ fn main() {
                 enc.write_all(data).unwrap();
                 let compressed = enc.finish().unwrap();
 
-                let (dir, file) = sha.split_at(2);
-                fs::create_dir_all(format!(".git/objects/{}", dir)).ok();
-                fs::write(format!(".git/objects/{}/{}", dir, file), compressed).unwrap();
+                let (hash_dir, hash_file) = sha.split_at(2);
+                fs::create_dir_all(format!(".git/objects/{}", hash_dir)).ok();
+                fs::write(format!(".git/objects/{}/{}", hash_dir, hash_file), compressed).unwrap();
 
                 sha
             }
@@ -282,13 +284,13 @@ fn main() {
         }
 
         "clone" => {
-            if args.len() < 4 {
+            if command_args.len() < 4 {
                 eprintln!("Usage: clone <url> <directory>");
                 return;
             }
 
-            let url = &args[2];
-            let dir = &args[3];
+            let url = &command_args[2];
+            let target_dir = &command_args[3];
 
             use std::error::Error;
 
@@ -419,10 +421,10 @@ fn main() {
                 enc.write_all(store)?;
                 let compressed = enc.finish()?;
 
-                let (dir, file) = sha.split_at(2);
-                let obj_dir = format!("{}/objects/{}", git_dir, dir);
+                let (hash_dir, hash_file) = sha.split_at(2);
+                let obj_dir = format!("{}/objects/{}", git_dir, hash_dir);
                 std::fs::create_dir_all(&obj_dir)?;
-                std::fs::write(format!("{}/{}", obj_dir, file), compressed)?;
+                std::fs::write(format!("{}/{}", obj_dir, hash_file), compressed)?;
 
                 Ok(sha)
             }
@@ -431,8 +433,8 @@ fn main() {
                 git_dir: &str,
                 sha: &str,
             ) -> Result<(String, Vec<u8>), Box<dyn Error>> {
-                let (dir, file) = sha.split_at(2);
-                let path = format!("{}/objects/{}/{}", git_dir, dir, file);
+                let (hash_dir, hash_file) = sha.split_at(2);
+                let path = format!("{}/objects/{}/{}", git_dir, hash_dir, hash_file);
 
                 let data = std::fs::read(path)?;
                 let mut decoder = ZlibDecoder::new(&data[..]);
@@ -663,7 +665,7 @@ fn main() {
                 Ok(())
             }
 
-            if let Err(e) = clone_repo(url, dir) {
+            if let Err(e) = clone_repo(url, target_dir) {
                 eprintln!("Error during clone: {}", e);
             }
         }
@@ -671,7 +673,7 @@ fn main() {
 
 
         _ => {
-            eprintln!("Unknown command: {}", args[1]);
+            eprintln!("Unknown command: {}", command_args[1]);
         }
     }
 }
